@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>웹 소켓 채팅</title>
+    </head>
+    <body>
+        <script>
+
+            //전송자명 입력하기
+            var sender = prompt('대화명을 입력해 주세요.');
+
+            if (sender !== "") {
+                localStorage.setItem('sender', sender);
+            }
+
+            //로드 시 바로 생성된 방 불러오기.
+            getRoomList();
+
+            function getRoomList() {
+                // Fetch API를 사용하여 GET 요청 전송
+                fetch('/chat/rooms')
+                    .then(response => response.json())
+                    .then(roomList => {
+                        console.log("채팅방 목록: ", roomList);
+
+                        // HTML 테이블에 채팅방 목록을 표시
+                        var tableHTML = '<table id="roomListTable">';
+                        roomList.forEach(function (room) {
+                            tableHTML += '<tr>';
+                            tableHTML += '<td><a href="/chat/room/enter/' + room.roomId + '">' + room.roomName + '</a></td>';
+                            tableHTML += '</tr>';
+                        });
+                        tableHTML += '</table>';
+
+                        // 기존의 테이블을 교체함
+                        var existingTable = document.getElementById('roomListTable');
+                        if (existingTable) {
+                            existingTable.innerHTML = tableHTML;
+                        } else {
+                            document.body.innerHTML += tableHTML;
+                        }
+                    })
+                    .catch(error => console.error("채팅방 목록 가져오기 실패:", error));
+            }
+
+            //채팅방 생성하기.
+            function createRoom() {
+
+                // 입력 필드에서 방 이름 가져오기
+                var roomName = document.getElementById('roomName').value;
+
+                // Fetch API를 사용하여 POST 요청 전송
+                fetch('/chat/room', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({roomName: roomName})
+                })
+                    .then(response => response.json())
+                    .then(room => {
+                        // 채팅방 생성이 완료되면 리스트에 표시하기
+                        getRoomList();
+                    })
+                    .catch(error => console.error("방 생성 실패:", error));
+            }
+
+
+        </script>
+
+        <div>
+            <input type="text" id="roomName" placeholder="방제목을 입력해주세요">
+            <button onclick="createRoom()">생성하기</button>
+        </div>
+
+
+    </body>
+</html>

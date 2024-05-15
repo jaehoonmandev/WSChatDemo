@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>채팅방</title>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.0/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<script th:inline="javascript">
+
+    //웹 소켓 인스턴스
+    var socket = new SockJS('/ws/chat');
+    var ws = Stomp.over(socket);
+
+    // localStorage에 등록한 전송자명 변수.
+    var sender = localStorage.getItem('sender');
+    // Controller에서 토스하여 받아온 ID를 저장하는 변수.
+    var roomId = [[${roomId}]];
+
+    getRoomData();
+
+    // 웹 소켓 인스턴스를 기반으로 연결 및 Subscribe
+    ws.connect({}, function(frame) {
+
+        console.log('연결: ' + frame);
+
+        //채팅방의 ID 값으로 해당 채팅방만을 Subscribe한다.
+        ws.subscribe('/topic/chat/room/' + roomId , function(message) {
+            showMessage(JSON.parse(message.body).sender + ": " + JSON.parse(message.body).message);
+        });
+        // 최초 입장시 다른 클라이언트들이 볼 수 있도록 메시지 전송.
+        // 클라이언트가 서버에 메지시를 보내야한다면 '/app'의 경로를 지정해줘야한다.
+        ws.send("/app/chat/sendMessage", {}, JSON.stringify(
+            {
+                type:'ENTER',
+                roomId: roomId,
+                sender: sender
+            }
+        ));
+    });
+
+    // 서버에서 받아온 메시지 핸들링
+    ws.onmessage = function (e) {
+        showMessage(e.message);
+    }
+
+
+
+    //ID 값으로 채팅방의 이름 등과 같은 정보를 가져온다.
+    function getRoomData() {
+        fetch('/chat/room/' + roomId)
+            .then(response => response.json())
+            .then(roomInfo => {
+
+                //현재는 방제목 외에 특별한 값이 없기에 방 제목만 바꿔준다.
+                var room_name = document.getElementById('room_name');
+
+                room_name.innerText = "방제목 : " + roomInfo.roomName;
+
+            })
+            .catch(error => console.error("채팅방 정보 가져오기 실패:", error));
+    }
+
+    //메시지 전송
+    function sendMessage() {
+        var messageInput = document.getElementById('messageInput');
+
+        //클라이언틑가 서버에
+        ws.send("/app/chat/sendMessage", {}, JSON.stringify({
+            type: 'TALK',
+            roomId: roomId,
+            message: messageInput.value,
+            sender: sender
+        }));
+        messageInput.value = '';
+    }
+
+    // 나가기.
+    function quit() {
+        ws.send("/app/chat/sendMessage", {}, JSON.stringify({
+            type: 'LEAVE',
+            roomId: roomId,
+            sender: sender
+        }));
+
+        //연결해제
+        ws.disconnect();
+        localStorage.removeItem('sender');
+        window.history.back();
+    }
+
+    // 메시지 렌더링
+    function showMessage(message) {
+        var messageArea = document.getElementById('messageArea');
+        var p = document.createElement('p');
+        p.textContent = message;
+        messageArea.appendChild(p);
+    }
+
+
+</script>
+
+<h1 id="room_name"> </h1>
+
+<div>
+
+    <input type="text" id="messageInput" placeholder="메시지를 입력하세요">
+    <button onclick="sendMessage()">전송</button>
+    <button onclick="quit()">나가기</button>
+</div>
+
+<div id = "messageArea"></div>
+
+</body>
+</html>
